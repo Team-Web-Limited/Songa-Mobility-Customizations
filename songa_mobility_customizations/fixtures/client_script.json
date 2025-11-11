@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Asset Movement",
+  "enabled": 1,
+  "modified": "2025-11-11 06:52:23.647062",
+  "module": "Songa Mobility Customizations",
+  "name": "Asset Movement Client Script",
+  "script": "frappe.ui.form.on('Asset Movement', {\n    refresh(frm) {\n        // Update all existing empty rows when form loads\n        if (frm.doc.custom_target_location) {\n            update_empty_child_rows(frm);\n        }\n    },\n    \n    custom_target_location: function(frm) {\n        // When parent target location changes, update all empty child rows\n        if (frm.doc.custom_target_location) {\n            update_empty_child_rows(frm);\n        }\n    }\n});\n\nfrappe.ui.form.on('Asset Movement Item', {\n    // This fires when a new row is added to the table\n    form_render: function(frm, cdt, cdn) {\n        var child = frappe.get_doc(cdt, cdn);\n        if (!child.target_location && frm.doc.custom_target_location) {\n            // Direct assignment instead of set_value\n            child.target_location = frm.doc.custom_target_location;\n            frm.refresh_field('assets');\n        }\n    },\n    \n    // Also handle when asset is set in the row\n    asset: function(frm, cdt, cdn) {\n        var child = frappe.get_doc(cdt, cdn);\n        if (!child.target_location && frm.doc.custom_target_location) {\n            // Direct assignment instead of set_value\n            child.target_location = frm.doc.custom_target_location;\n            frm.refresh_field('assets');\n        }\n    }\n});\n\nfunction update_empty_child_rows(frm) {\n    let updated = false;\n    if (frm.doc.assets && frm.doc.assets.length > 0) {\n        frm.doc.assets.forEach(function(row) {\n            if (!row.target_location && frm.doc.custom_target_location) {\n                // Direct assignment instead of set_value\n                row.target_location = frm.doc.custom_target_location;\n                updated = true;\n            }\n        });\n        if (updated) {\n            frm.refresh_field('assets');\n        }\n    }\n}",
+  "view": "Form"
+ }
+]
