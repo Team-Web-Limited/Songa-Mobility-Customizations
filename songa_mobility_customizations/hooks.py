@@ -140,6 +140,9 @@ app_license = "mit"
 doc_events = {
     "Purchase Order": {
         "validate": "songa_mobility_customizations.services.rest.validate_purchase_order"
+    },
+    "Sales Order": {
+        "on_submit": "songa_mobility_customizations.services.rest.create_sales_invoices_from_payment_terms"
     }
 # 	"*": {
 # 		"on_update": "method",
