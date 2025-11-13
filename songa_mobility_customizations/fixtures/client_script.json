@@ -20,5 +20,16 @@
   "name": "Material Request Client Script",
   "script": "frappe.ui.form.on('Material Request', {\n\trefresh(frm) {\n\t\t\t\tsetTimeout(() => {\n          frm.remove_custom_button('Material Transfer','Create');\n\n     },1000);\n\t}\n})\n\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Purchase Order",
+  "enabled": 1,
+  "modified": "2025-11-13 13:16:36.677014",
+  "module": "Songa Mobility Customizations",
+  "name": "Purchase Order Client Script",
+  "script": "frappe.ui.form.on('Purchase Order Item', {\n    items_add(frm, cdt, cdn) {\n        let item = frappe.get_doc(cdt, cdn);\n        frappe.db.get_value('Item', item.item_code, 'custom_has_attachments', (r) => {\n            if (r.custom_has_attachments) {\n                frappe.show_alert({\n                    message: __('This item requires attachments'),\n                    indicator: 'orange'\n                });\n            }\n        });\n    }\n});",
+  "view": "Form"
  }
 ]
