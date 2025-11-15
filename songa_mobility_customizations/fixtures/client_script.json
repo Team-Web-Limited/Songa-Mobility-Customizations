@@ -31,5 +31,27 @@
   "name": "Purchase Order Client Script",
   "script": "frappe.ui.form.on('Purchase Order Item', {\n    items_add(frm, cdt, cdn) {\n        let item = frappe.get_doc(cdt, cdn);\n        frappe.db.get_value('Item', item.item_code, 'custom_has_attachments', (r) => {\n            if (r.custom_has_attachments) {\n                frappe.show_alert({\n                    message: __('This item requires attachments'),\n                    indicator: 'orange'\n                });\n            }\n        });\n    }\n});",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Purchase Receipt",
+  "enabled": 0,
+  "modified": "2025-11-15 13:41:04.712998",
+  "module": "Songa Mobility Customizations",
+  "name": "Purchase Receipt Client Script",
+  "script": "",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Landed Cost Voucher",
+  "enabled": 1,
+  "modified": "2025-11-15 14:23:57.638981",
+  "module": "Songa Mobility Customizations",
+  "name": "Landed Cost Voucher Client Script",
+  "script": "frappe.ui.form.on('Landed Cost Voucher', {\n    refresh: function(frm) {\n        // Add custom button to fetch linked charges\n        frm.add_custom_button(__('Fetch All Charges'), function() {\n            fetch_linked_charges(frm);\n        });\n    }\n});\n\nfunction fetch_linked_charges(frm) {\n    console.log(\"Fetch All Charges button clicked\");\n    console.log(\"Purchase Receipts table data:\", frm.doc.purchase_receipts);\n    \n    // Check if purchase receipts are selected\n    if (!frm.doc.purchase_receipts || frm.doc.purchase_receipts.length === 0) {\n        frappe.msgprint({\n            title: __('Warning'),\n            indicator: 'orange',\n            message: __('Please select at least one Purchase Receipt in the Purchase Receipts table first.')\n        });\n        return;\n    }\n    \n    // Filter out empty or null purchase receipts\n    const validPurchaseReceipts = frm.doc.purchase_receipts\n        .filter(pr => pr.receipt_document)\n        .map(pr => pr.receipt_document);\n    \n    console.log(\"Valid Purchase Receipts:\", validPurchaseReceipts);\n    \n    if (validPurchaseReceipts.length === 0) {\n        frappe.msgprint({\n            title: __('Warning'),\n            indicator: 'orange',\n            message: __('Please select at least one valid Purchase Receipt in the Purchase Receipts table first.')\n        });\n        return;\n    }\n\n    frappe.call({\n        method: 'songa_mobility_customizations.services.rest.fetch_linked_charges',\n        args: {\n            'purchase_receipts': validPurchaseReceipts\n        },\n        callback: function(r) {\n            console.log(\"Server response:\", r);\n            if (r.message) {\n                if (r.message.length === 0) {\n                    frappe.msgprint({\n                        title: __('No Items Found'),\n                        indicator: 'blue',\n                        message: __('No linked charges found for the selected Purchase Receipts.')\n                    });\n                    return;\n                }\n                update_lcv_taxes(frm, r.message); // Changed to update taxes table\n                frappe.show_alert({\n                    message: __('Successfully fetched {0} additional charges', [r.message.length]),\n                    indicator: 'green'\n                });\n            }\n        },\n        error: function(err) {\n            console.error(\"Error fetching linked charges:\", err);\n            frappe.msgprint({\n                title: __('Error'),\n                indicator: 'red',\n                message: __('Failed to fetch linked charges. Please try again.')\n            });\n        }\n    });\n}\n\nfunction update_lcv_taxes(frm, charges) {\n    // Clear existing taxes/charges (optional - you might want to keep existing ones)\n    // frm.clear_table('taxes');\n    \n    // Add new charges to the Taxes and Charges table\n    charges.forEach(charge => {\n        let child = frm.add_child('taxes');\n        \n        // Map the fields according to Landed Cost Taxes and Charges table structure\n        child.expense_account = charge.expense_account;\n        child.description = charge.description || charge.item_name || charge.item_code;\n        child.amount = charge.amount;\n        \n        // Set account currency and exchange rate if needed\n        child.account_currency = \"KES\"; // Default currency, adjust as needed\n        child.exchange_rate = 1; // Default exchange rate\n        \n        // Optional: Store reference to the source document for tracking\n        child.custom_source_receipt = charge.receipt_document;\n        child.custom_source_item = charge.purchase_receipt_item;\n    });\n    \n    // Refresh the taxes table\n    frm.refresh_field('taxes');\n    \n    // Trigger calculation of totals\n    frm.trigger('calculate_totals');\n}",
+  "view": "Form"
  }
 ]
