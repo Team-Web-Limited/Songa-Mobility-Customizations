@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate
-from frappe.model.mapper import get_mapped_doc
+
 from frappe.model.document import Document
 import json
 
@@ -27,79 +26,6 @@ def validate_purchase_order(doc, method):
             ).format(", ".join(items_requiring_attachments)))
 
 
-def create_sales_invoices_from_payment_terms(doc, method):
-  
-    if doc.docstatus != 1:
-        return
-    
-    if not doc.payment_schedule:
-        frappe.msgprint("No payment terms found. No invoices created.")
-        return
-    
-    for payment_term in doc.payment_schedule:
-        create_sales_invoice_for_term(doc, payment_term)
-
-def create_sales_invoice_for_term(sales_order, payment_term):
-   
-    try:
-        portion = flt(payment_term.invoice_portion) / 100
-        
-        def postprocess(source, target):
-            target.due_date = payment_term.due_date
-            target.payment_terms_template = source.payment_terms_template
-            
-            # Adjust item quantities proportionally
-            for item in target.items:
-                item.qty = flt(item.qty) * portion
-            
-            # Let Frappe calculate the amounts automatically
-            target.run_method("set_missing_values")
-            target.run_method("calculate_taxes_and_totals")
-            
-            # Clear existing payment schedule and add only this term
-            target.payment_schedule = []
-            target.append("payment_schedule", {
-                "payment_term": payment_term.payment_term,
-                "due_date": payment_term.due_date,
-                "invoice_portion": 100.0,  # This invoice represents 100% of its portion
-                "payment_amount": target.grand_total,
-                "base_payment_amount": target.base_grand_total,
-                "outstanding": target.grand_total,
-                "base_outstanding": target.base_grand_total
-            })
-        
-        sales_invoice = get_mapped_doc(
-            "Sales Order",
-            sales_order.name,
-            {
-                "Sales Order": {
-                    "doctype": "Sales Invoice",
-                    "field_map": {
-                        "order_type": "order_type",
-                        "customer": "customer",
-                        "company": "company",
-                        "currency": "currency"
-                    }
-                },
-                "Sales Order Item": {
-                    "doctype": "Sales Invoice Item",
-                    "field_map": {
-                        "name": "sales_order_item",
-                        "parent": "sales_order",
-                    },
-                    "condition": lambda doc: doc.qty > 0
-                }
-            },
-            target_doc=None,
-            postprocess=postprocess
-        )
-        
-        sales_invoice.insert()
-        frappe.msgprint(f"Created Sales Invoice: {sales_invoice.name} for {payment_term.payment_term}")
-        
-    except Exception as e:
-        frappe.log_error(f"Error creating Sales Invoice: {str(e)}")
-        frappe.throw(f"Failed to create Sales Invoice: {str(e)}")
 
 
 
@@ -180,3 +106,49 @@ def fetch_linked_charges(purchase_receipts):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), _('Error fetching linked charges'))
         frappe.throw(_('Failed to fetch linked charges: {0}').format(str(e)))
+
+
+
+
+@frappe.whitelist()
+def get_stock_info(item_code, warehouse):
+    # Ensure valid args
+    if not item_code or not warehouse:
+        return {"error": "Item code and warehouse are required"}
+
+    # 1️⃣ Get stock info for selected warehouse
+    bin_data = frappe.db.get_value(
+        "Bin",
+        {"item_code": item_code, "warehouse": warehouse},
+        ["actual_qty", "valuation_rate"],
+        as_dict=True
+    )
+
+    # Handle case when NO Bin record exists for that warehouse
+    if not bin_data:
+        bin_data = {"actual_qty": 0, "valuation_rate": 0}
+
+    available_qty = bin_data.get("actual_qty", 0) or 0
+    valuation_rate = bin_data.get("valuation_rate", 0) or 0
+
+    # 2️⃣ Find other warehouses with stock (excluding the selected one)
+    other_wh = []
+    if available_qty <= 0:
+        other_wh = frappe.db.get_list(
+            "Bin",
+            fields=["warehouse", "actual_qty"],
+            filters={
+                "item_code": item_code,
+                "actual_qty": [">", 0],
+                "warehouse": ["!=", warehouse]
+            },
+            order_by="actual_qty desc"
+        )
+
+    return {
+        "available_qty": available_qty,
+        "valuation_rate": valuation_rate,
+        "total_value": available_qty * valuation_rate,
+        "other_warehouses": other_wh
+    }
+

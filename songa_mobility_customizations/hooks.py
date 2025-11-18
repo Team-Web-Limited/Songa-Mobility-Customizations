@@ -139,11 +139,8 @@ app_license = "mit"
 
 doc_events = {
     "Purchase Order": {
-        "validate": "songa_mobility_customizations.services.rest.validate_purchase_order"
+        "before_submit": "songa_mobility_customizations.services.rest.validate_purchase_order"
     },
-    "Sales Order": {
-        "on_submit": "songa_mobility_customizations.services.rest.create_sales_invoices_from_payment_terms"
-    }
 # 	"*": {
 # 		"on_update": "method",
 # 		"on_cancel": "method",
@@ -154,13 +151,13 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
+scheduler_events = {
 # 	"all": [
 # 		"songa_mobility_customizations.tasks.all"
 # 	],
-# 	"daily": [
-# 		"songa_mobility_customizations.tasks.daily"
-# 	],
+	"daily": [
+		"songa_mobility_customizations.services.cron.generate_scheduled_invoices"
+	],
 # 	"hourly": [
 # 		"songa_mobility_customizations.tasks.hourly"
 # 	],
@@ -170,7 +167,17 @@ doc_events = {
 # 	"monthly": [
 # 		"songa_mobility_customizations.tasks.monthly"
 # 	],
+}
+
+
+# scheduler_events = {
+#     "cron": {
+#         "30 0 * * *": [
+#             "songa_mobility_customizations.services.rest.generate_scheduled_invoices"
+#         ]
+#     }
 # }
+
 
 # Testing
 # -------
