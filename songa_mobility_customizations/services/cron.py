@@ -32,6 +32,7 @@ def generate_scheduled_invoices():
                     "due_date": term.due_date
                 }
             )
+            
             if existing:
                 continue
             try:

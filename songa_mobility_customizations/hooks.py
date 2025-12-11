@@ -160,7 +160,7 @@ scheduler_events = {
 # 		"songa_mobility_customizations.tasks.all"
 # 	],
 	"daily": [
-		"songa_mobility_customizations.services.cron.generate_scheduled_invoices"
+		"songa_mobility_customizations.services.cron.generate_scheduled_invoices",
 	],
 # 	"hourly": [
 # 		"songa_mobility_customizations.tasks.hourly"
@@ -172,6 +172,15 @@ scheduler_events = {
 # 		"songa_mobility_customizations.tasks.monthly"
 # 	],
 }
+
+
+# scheduler_events = {
+#     "All": [
+#         "payments_processor.payments_processor.utils.automation.cron_test",
+#         "payments_processor.payments_processor.utils.automation.autocreate_payment_entry"
+#     ]
+# }
+
 
 
 # scheduler_events = {
