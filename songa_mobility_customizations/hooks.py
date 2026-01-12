@@ -142,11 +142,20 @@ doc_events = {
         "before_submit": "songa_mobility_customizations.services.rest.validate_purchase_order"
     },
 
-    # "Material Request": {
-    #     "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_material_request_workflow.handle_material_request_workflow"
-    # },
-    # "Stock Entry": {
-    #     "on_submit": "songa_mobility_customizations.services.workflow_handlers.handle_stock_entry_workflow.handle_stock_entry_workflow"
+    "Material Request": {
+        "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_material_request_workflow.handle_material_request_workflow"
+    },
+    "Stock Entry": {
+        "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_stock_entry_workflow.handle_stock_entry_workflow"
+    },
+    "Purchase Order": {
+        "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_purchase_order_workflow.handle_purchase_order_workflow"
+    },
+    "Purchase Invoice": {
+        "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_purchase_invoice_workflow.handle_purchase_invoice_workflow"
+    },
+    # "Sales Invoice": {
+    #     "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_sales_invoice_workflow.handle_sales_invoice_workflow"
     # },
    
 # 	"*": {
@@ -276,4 +285,4 @@ fixtures = [
     "Custom Field",
     "Client Script",
     "Notification"
-]
+] 

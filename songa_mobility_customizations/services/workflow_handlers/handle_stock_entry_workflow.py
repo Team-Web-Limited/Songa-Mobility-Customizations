@@ -4,49 +4,58 @@ from songa_mobility_customizations.services.notifications.branch_role import get
 
 def handle_stock_entry_workflow(doc, method):
     """
-    Handle notifications for Stock Entry submission
-    Triggered on_submit of Stock Entry documents
+    Handle notifications for Stock Entry workflow
+    Triggered on_update of Stock Entry documents
     """
     if doc.purpose != "Material Transfer":
         print(f"Skipping Stock Entry Notification: Purpose is {doc.purpose}")
         return
 
-    # Check if items are being added to transit (implies movement to transit warehouse)
-    # or validation logic specific to "In Transit" step if workflow field exists.
-    # Standard Stock Entry for Material Transfer moves from Source to Target.
-    # If the user requirement is "Material Transfer In Transit", it usually means 
-    # the goods are leaving the source and going to a transit warehouse (or target).
-    
-    # Assuming 'add_to_transit' check or simply on submission of a Material Transfer
-    # where the target warehouse implies transit/destination.
-    # The requirement says: "marked In Transit".
-    
-    # We will check if there is a target warehouse and notify its Hub Manager
-    
-    # Get Target Warehouse from the first item (assuming all go to same place for this context)
-    to_warehouse = doc.items[0].t_warehouse if doc.items else None
-    
-    if not to_warehouse:
-        print(f"Skipping Stock Entry Notification: No target warehouse found for {doc.name}")
-        return
+    # Check if workflow state changed to "In Transit"
+    if doc.has_value_changed("workflow_state") and doc.workflow_state == "In Transit":
+        # Get Material Request from the items (assuming created from MR)
+        material_request_name = None
+        for item in doc.items:
+            if item.material_request:
+                material_request_name = item.material_request
+                break
+        
+        real_target_warehouse = None
+        
+        if material_request_name:
+            # Fetch the Material Request document to get the actual target warehouse
+            mr_doc = frappe.get_doc("Material Request", material_request_name)
+            # In Material Request, the target warehouse is usually 'set_warehouse' (for Transfer)
+            # or 'to_warehouse' in items. Based on previous context, 'set_warehouse' is used.
+            real_target_warehouse = mr_doc.set_warehouse or (mr_doc.items[0].warehouse if mr_doc.items else None)
+            
+            print(f"\n\n\n\n\n Linked Material Request: {material_request_name} | Real Target Warehouse: {real_target_warehouse} \n\n\n\n\n")
+        else:
+            # Fallback if no MR linked (though workflow implies it)
+             print(f"\n\n\n\n\n No linked Material Request found in items for {doc.name} \n\n\n\n\n")
+             return
 
-    notify_target_hub_manager(doc, to_warehouse)
+        if not real_target_warehouse:
+            print(f"Skipping Stock Entry Notification: No target warehouse found via MR for {doc.name}")
+            return
+
+        notify_target_hub_manager(doc, real_target_warehouse)
 
 
 def notify_target_hub_manager(doc, to_warehouse):
-    print("\n\n\n\n\n notify_target_hub_manager \n\n\n\n")
+    print(f"\n\n\n\n\n notify_target_hub_manager : {to_warehouse} \n\n\n\n\n")
     try:
         warehouse = frappe.get_doc("Warehouse", to_warehouse)
         branch = warehouse.custom_branch
-        print("\n\n\n\n\n branch \n\n\n\n\n", branch)
+        print(f"\n\n\n\n\n branch : {branch}\n\n\n\n\n")
 
         # Get all users with role 'Hub Manager' for this branch
         hub_managers = get_users_by_branch_and_role(branch, "Hub Manager")
-        print("\n\n\n\n\n hub_managers \n\n\n\n\n", hub_managers)
+        print(f"\n\n\n\n\n hub_managers : {hub_managers}\n\n\n\n\n")
         
         if not hub_managers:
             frappe.log_error(f"No Hub Manager found for branch {branch}", "Workflow Notification")
-            print("\n\n\n\n\n No Hub Manager found for branch {branch} \n\n\n\n\n")
+            print(f"\n\n\n\n\n No Hub Manager found for branch {branch} \n\n\n\n\n")
             return
 
         # Document URL
@@ -66,7 +75,7 @@ def notify_target_hub_manager(doc, to_warehouse):
         """
 
         for manager in hub_managers:
-            print("\n\n\n\n\n manager \n\n\n\n\n", manager)
+            print(f"\n\n\n\n\n manager : {manager}\n\n\n\n\n")
             frappe.sendmail(
                 recipients=[manager],
                 subject=subject,

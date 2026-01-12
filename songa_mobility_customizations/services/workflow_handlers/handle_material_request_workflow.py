@@ -9,130 +9,166 @@ def handle_material_request_workflow(doc, method):
     Handle workflow state changes for Material Request
     Triggered on_update of Material Request documents
     """
-    # Only proceed for Material Transfer type
-    if doc.material_request_type != "Material Transfer":
-        print(f"Skipping workflow handler: Type is {doc.material_request_type}")
-        return
-    
-    print("\n\n\n\n Material Request Workflow \n\n\n\n")
     
     # Check if workflow state changed to "Pending Approval"
     if doc.has_value_changed("workflow_state") and doc.workflow_state == "Pending Approval":
-        print("\n\n\n\n workflow state value changed Pending Approval \n\n\n\n")
-        notify_hub_manager(doc)
+        print("\n\n\n\n\n workflow state value changed Pending Approval \n\n\n\n")
+        
+        if doc.material_request_type == "Material Transfer":
+            notify_transfer_pending_approval(doc)
+            
+        elif doc.material_request_type == "Material Issue":
+             notify_issue_pending_approval(doc)
+             
+        elif doc.material_request_type == "Purchase":
+             notify_purchase_pending_approval(doc)
 
     # Check if workflow state changed to "Approved"
     if doc.has_value_changed("workflow_state") and doc.workflow_state == "Approved":
-        print("\n\n\n\n Approved \n\n\n\n")
-        notify_operations_manager(doc)
+        print("\n\n\n\n\n Approved \n\n\n\n")
+        
+        if doc.material_request_type == "Material Transfer":
+            notify_transfer_approved(doc)
 
 
-def notify_hub_manager(doc):
-    print("\n\n\n\n notify_hub_manager \n\n\n\n")
+# --- Notification Functions ---
+
+def notify_transfer_pending_approval(doc):
+    print("\n\n\n\n\n notify_transfer_pending_approval \n\n\n\n")
+    # For Transfer, source is set_from_warehouse
+    warehouse_name = doc.set_from_warehouse
+    
+    # To: Hub Manager (HM Source Warehouse)
+    notify_hub_manager(doc, subject_prefix="Material Transfer Request", 
+                       body_intro="A Material Transfer Request has been submitted for your approval.",
+                       body_instruction="Please review quantities, valuation, and availability, then approve or reject.",
+                       warehouse_name=warehouse_name)
+
+
+def notify_issue_pending_approval(doc):
+    print("\n\n\n\n\n notify_issue_pending_approval \n\n\n\n")
+    # For Issue, source is in items.warehouse
+    warehouse_name = doc.items[0].warehouse if doc.items else None
+    
+    # To: Hub Manager (HM Source Warehouse)
+    notify_hub_manager(doc, subject_prefix="Material Issue Request", 
+                       body_intro="A Material Issue Request has been submitted for your approval.",
+                       body_instruction="Review item quantity, valuation, and purpose, then approve or reject.",
+                       warehouse_name=warehouse_name)
+
+
+def notify_purchase_pending_approval(doc):
+    print("\n\n\n\n\n notify_purchase_pending_approval \n\n\n\n")
+    # To: Operations Manager (OM)
+    # Subject: Purchase Material Request Pending Approval
+    # Body: A Purchase Material Request has been submitted. Please approve the request and create the corresponding Purchase Order.
+    
+    # Get all users with role 'Operations Manager'
+    ops_managers = frappe.get_all("Has Role", filters={"role": "Operations Manager", "parenttype": "User"}, pluck="parent")
+    
+    print("\n\n\n\n\n ops_managers \n\n\n\n\n", ops_managers)
+    
+    if not ops_managers:
+        frappe.log_error("No Operations Manager found", "Workflow Notification")
+        print("\n\n\n\n\n No Operations Manager found \n\n\n\n\n")
+        return
+
+    doc_url = get_url(doc.get_url())
+    subject = "Purchase Material Request Pending Approval"
+    
+    message = f"""
+    <p>A Purchase Material Request has been submitted.</p>
+    <ul>
+        <li><strong>Request ID:</strong> {doc.name}</li>
+        <li><strong>Requested By:</strong> {doc.owner}</li>
+        <li><strong>Items:</strong> {len(doc.items)} item(s)</li>
+    </ul>
+    <p>Please approve the request and create the corresponding Purchase Order.</p>
+    <p>Access the request here: <a href="{doc_url}">{doc.name}</a></p>
     """
-    Notify the Hub Manager(s) responsible for the branch of the source warehouse
+
+    for manager in ops_managers:
+        frappe.sendmail(recipients=[manager], subject=subject, message=message, now=True)
+
+    frappe.msgprint(f"Operations Manager notified about {doc.name}")
+
+
+def notify_transfer_approved(doc):
+    print("\n\n\n\n\n notify_transfer_approved \n\n\n\n\n")
+    # To: Operations Manager (OM)
+    # Subject: Material Transfer Request Pending Approval
+    # Body: A Material Transfer Request has been approved by (Hub Manager name). Next step: create the Material Transfer and mark it as In Transit.
+    
+    ops_managers = frappe.get_all("Has Role", filters={"role": "Operations Manager", "parenttype": "User"}, pluck="parent")
+    
+    print("\n\n\n\n\n ops_managers \n\n\n\n\n", ops_managers)
+    
+    if not ops_managers:
+        frappe.log_error("No Operations Manager found", "Workflow Notification")
+        return
+
+    doc_url = get_url(doc.get_url())
+    subject = "Material Transfer Request Pending Approval"
+    
+    hub_manager_name = frappe.db.get_value("User", doc.modified_by, "full_name") or doc.modified_by
+    
+    message = f"""
+    <p>A Material Transfer Request has been approved by {hub_manager_name}.</p>
+    <p>Next step: create the Material Transfer and mark it as In Transit.</p>
+    <p>Access the request here: <a href="{doc_url}">{doc.name}</a></p>
     """
+
+    for manager in ops_managers:
+        frappe.sendmail(recipients=[manager], subject=subject, message=message, now=True)
+
+    frappe.msgprint(f"Operations Manager notified about {doc.name}")
+
+
+# --- Helper ---
+
+def notify_hub_manager(doc, subject_prefix, body_intro, body_instruction, warehouse_name=None):
+    print(f"\n\n\n\n\n notify_hub_manager {subject_prefix} \n\n\n\n\n")
     try:
-        from_warehouse = doc.set_from_warehouse
-        if not from_warehouse:
+        # Use provided warehouse name, or fallback to set_from_warehouse (legacy/safe default)
+        target_warehouse = warehouse_name or doc.get("set_from_warehouse")
+        
+        if not target_warehouse:
             frappe.log_error(f"No source warehouse found for {doc.name}", "Workflow Notification")
+            print(f"No warehouse found for {doc.name}")
             return
 
-        warehouse = frappe.get_doc("Warehouse", from_warehouse)
+        warehouse = frappe.get_doc("Warehouse", target_warehouse)
+        print(f"\n\n\n\n\n warehouse {warehouse} \n\n\n\n\n")
         branch = warehouse.custom_branch
+        print(f"\n\n\n\n\n branch {branch} \n\n\n\n\n")
 
-        # Get all users with role 'Hub Manager' for this branch
         hub_managers = get_users_by_branch_and_role(branch, "Hub Manager")
-        print("\n\n\n\n hub_managers \n\n", hub_managers)
+        print(f"\n\n\n\n\n hub_managers {hub_managers} \n\n\n\n\n")
         
         if not hub_managers:
             frappe.log_error(f"No Hub Manager found for branch {branch}", "Workflow Notification")
-            print("\n\n\n\n No Hub Manager found for branch {branch} \n\n")
+            print(f"\n\n\n\n\n No Hub Manager found for branch {branch} \n\n\n\n\n")
             return
 
-        # Document URL
         doc_url = get_url(doc.get_url())
-
-        subject = "Material Transfer Request Pending Approval"
+        subject = f"{subject_prefix} Pending Approval"
+        
         message = f"""
-        <p>A Material Transfer Request has been submitted for your approval.</p>
+        <p>{body_intro}</p>
         <ul>
             <li><strong>Request ID:</strong> {doc.name}</li>
             <li><strong>Requested By:</strong> {doc.owner}</li>
-            <li><strong>From Warehouse:</strong> {doc.set_from_warehouse}</li>
-            <li><strong>To Warehouse:</strong> {doc.get('set_warehouse', 'Not specified')}</li>
+            <li><strong>Warehouse:</strong> {target_warehouse}</li>
             <li><strong>Items:</strong> {len(doc.items)} item(s)</li>
         </ul>
-        <p>Please review quantities, valuation, and availability, then approve or reject.</p>
+        <p>{body_instruction}</p>
         <p>Access the request here: <a href="{doc_url}">{doc.name}</a></p>
         """
 
         for manager in hub_managers:
-            frappe.sendmail(
-                recipients=[manager],
-                subject=subject,
-                message=message,
-                now=True
-            )
+            frappe.sendmail(recipients=[manager], subject=subject, message=message, now=True)
 
         frappe.msgprint(f"Hub Manager(s) for branch '{branch}' notified about {doc.name}")
 
     except Exception as e:
         frappe.log_error(f"Error notifying Hub Manager: {str(e)}", "Workflow Notification")
-
-
-def notify_operations_manager(doc):
-    print("\n\n\n\n\n notify_operations_manager \n\n\n\n\n")
-    """
-    Notify the Operations Manager(s) responsible for the branch of the source warehouse
-    """
-    try:
-        from_warehouse = doc.set_from_warehouse
-        if not from_warehouse:
-            frappe.log_error(f"No source warehouse found for {doc.name}", "Workflow Notification")
-            return
-
-        warehouse = frappe.get_doc("Warehouse", from_warehouse)
-        print("\n\n\n\n\n warehouse \n\n\n\n\n", warehouse)
-        branch = warehouse.custom_branch
-        print("\n\n\n\n\n branch \n\n\n\n\n", branch)
-
-        # Get all users with role 'Operations Manager' for this branch
-        ops_managers = get_users_by_branch_and_role(branch, "Operations Manager")
-        print("\n\n\n\n\n ops_managers \n\n\n\n\n", ops_managers)
-        
-        if not ops_managers:
-            frappe.log_error(f"No Operations Manager found for branch {branch}", "Workflow Notification")
-            print("\n\n\n\n\n No Operations Manager found for branch {branch} \n\n\n\n\n")
-            return
-
-        # Document URL
-        doc_url = get_url(doc.get_url())
-        print("\\n\\n\\n\\n\\n doc_url \\n\\n\\n\\n\\n", doc_url)
-
-        subject = "Material Transfer Request Pending Approval"
-        
-        # Helper to get full name
-        hub_manager_name = frappe.db.get_value("User", doc.modified_by, "full_name") or doc.modified_by
-        
-        message = f"""
-        <p>A Material Transfer Request has been approved by {hub_manager_name}.</p>
-        <p>Next step: create the Material Transfer and mark it as In Transit.</p>
-        <p>Access the request here: <a href="{doc_url}">{doc.name}</a></p>
-        """
-
-        for manager in ops_managers:
-            print("\\n\\n\\n\\n\\n manager \\n\\n\\n\\n\\n", manager)
-            print("\\n\\n\\n\\n\\n subject \\n\\n\\n\\n\\n", subject)
-            print("\\n\\n\\n\\n\\n message \\n\\n\\n\\n\\n", message)
-            frappe.sendmail(
-                recipients=[manager],
-                subject=subject,
-                message=message,
-                now=True
-            )
-
-        frappe.msgprint(f"Operations Manager(s) for branch '{branch}' notified about {doc.name}")
-
-    except Exception as e:
-        frappe.log_error(f"Error notifying Operations Manager: {str(e)}", "Workflow Notification") 
