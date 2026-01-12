@@ -41,6 +41,7 @@ def generate_scheduled_invoices():
                 frappe.log_error(f"Failed to create invoice for SO {sales_order.name}, term {term.payment_term}: {str(e)}")
 
 
+
 def create_sales_invoice_for_term(sales_order, payment_term):
     portion = flt(payment_term.invoice_portion) / 100
 
