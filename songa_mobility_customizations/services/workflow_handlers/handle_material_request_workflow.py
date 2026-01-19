@@ -5,10 +5,6 @@ from songa_mobility_customizations.services.notifications.branch_role import get
 
 def handle_material_request_workflow(doc, method):
     print("\n\n\n\n\n handle_material_request_workflow \n\n\n\n\n")
-    """
-    Handle workflow state changes for Material Request
-    Triggered on_update of Material Request documents
-    """
     
     # Check if workflow state changed to "Pending Approval"
     if doc.has_value_changed("workflow_state") and doc.workflow_state == "Pending Approval":
@@ -60,10 +56,7 @@ def notify_issue_pending_approval(doc):
 def notify_purchase_pending_approval(doc):
     print("\n\n\n\n\n notify_purchase_pending_approval \n\n\n\n")
     # To: Operations Manager (OM)
-    # Subject: Purchase Material Request Pending Approval
-    # Body: A Purchase Material Request has been submitted. Please approve the request and create the corresponding Purchase Order.
     
-    # Get all users with role 'Operations Manager'
     ops_managers = frappe.get_all("Has Role", filters={"role": "Operations Manager", "parenttype": "User"}, pluck="parent")
     
     print("\n\n\n\n\n ops_managers \n\n\n\n\n", ops_managers)
