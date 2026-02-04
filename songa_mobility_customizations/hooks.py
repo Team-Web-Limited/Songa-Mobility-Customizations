@@ -139,8 +139,7 @@ app_license = "mit"
 
 doc_events = {
     "Purchase Order": {
-        "before_submit": "songa_mobility_customizations.services.rest.validate_purchase_order",
-        "on_update": "songa_mobility_customizations.services.workflow_handlers.handle_purchase_order_workflow.handle_purchase_order_workflow"
+        "before_submit": "songa_mobility_customizations.services.rest.validate_purchase_order"
     },
 
     "Material Request": {
