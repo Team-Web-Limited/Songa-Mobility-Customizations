@@ -169,6 +169,7 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
+
 scheduler_events = {
 # 	"all": [
 # 		"songa_mobility_customizations.tasks.all"
@@ -285,5 +286,6 @@ scheduler_events = {
 fixtures = [
     "Custom Field",
     "Client Script",
-    "Notification"
+    "Notification",
+    "Property Setter"
 ] 
