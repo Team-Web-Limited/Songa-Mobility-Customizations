@@ -133,6 +133,12 @@ app_license = "mit"
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+override_doctype_class = {
+    "Budget": "songa_mobility_customizations.overrides.budget.CustomBudget"
+}
+
+
+
 # Document Events
 # ---------------
 # Hook on document methods and events
