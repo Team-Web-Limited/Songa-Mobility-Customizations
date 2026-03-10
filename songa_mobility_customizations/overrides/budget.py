@@ -10,7 +10,7 @@ class CustomBudget(Budget):
         if self.budget_against == "Department":
             budget_against_field = "custom_department"
         elif self.budget_against == "Branch":
-            budget_against_field = "custom_branch"
+            budget_against_field = "branch"
             
         if not self.get(budget_against_field):
             frappe.throw(_("{0} is mandatory").format(self.budget_against))
@@ -25,7 +25,7 @@ class CustomBudget(Budget):
         if self.budget_against == "Department":
             budget_against_field = "custom_department"
         elif self.budget_against == "Branch":
-            budget_against_field = "custom_branch"
+            budget_against_field = "branch"
             
         budget_against = self.get(budget_against_field)
         
@@ -58,15 +58,15 @@ class CustomBudget(Budget):
         if self.budget_against == "Cost Center":
             self.project = None
             self.custom_department = None
-            self.custom_branch = None
+            self.branch = None
         elif self.budget_against == "Project":
             self.cost_center = None
             self.custom_department = None
-            self.custom_branch = None
+            self.branch = None
         elif self.budget_against == "Department":
             self.cost_center = None
             self.project = None
-            self.custom_branch = None
+            self.branch = None
         elif self.budget_against == "Branch":
             self.cost_center = None
             self.project = None
