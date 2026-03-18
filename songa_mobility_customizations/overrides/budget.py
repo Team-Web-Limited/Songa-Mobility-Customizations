@@ -8,7 +8,7 @@ class CustomBudget(Budget):
         # Override the standard validate to handle custom fields correctly
         budget_against_field = frappe.scrub(self.budget_against)
         if self.budget_against == "Department":
-            budget_against_field = "custom_department"
+            budget_against_field = "department"
         elif self.budget_against == "Branch":
             budget_against_field = "branch"
             
@@ -23,7 +23,7 @@ class CustomBudget(Budget):
     def custom_validate_duplicate(self):
         budget_against_field = frappe.scrub(self.budget_against)
         if self.budget_against == "Department":
-            budget_against_field = "custom_department"
+            budget_against_field = "department"
         elif self.budget_against == "Branch":
             budget_against_field = "branch"
             
@@ -57,11 +57,11 @@ class CustomBudget(Budget):
     def set_null_value(self):
         if self.budget_against == "Cost Center":
             self.project = None
-            self.custom_department = None
+            self.department = None
             self.branch = None
         elif self.budget_against == "Project":
             self.cost_center = None
-            self.custom_department = None
+            self.department = None
             self.branch = None
         elif self.budget_against == "Department":
             self.cost_center = None
@@ -70,4 +70,4 @@ class CustomBudget(Budget):
         elif self.budget_against == "Branch":
             self.cost_center = None
             self.project = None
-            self.custom_department = None
+            self.department = None
