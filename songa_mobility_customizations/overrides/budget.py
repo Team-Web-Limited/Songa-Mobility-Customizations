@@ -5,7 +5,6 @@ from erpnext.accounts.doctype.budget.budget import Budget, DuplicateBudgetError
 class CustomBudget(Budget):
 
     def validate(self):
-        # Override the standard validate to handle custom fields correctly
         budget_against_field = frappe.scrub(self.budget_against)
         if self.budget_against == "Department":
             budget_against_field = "department"
