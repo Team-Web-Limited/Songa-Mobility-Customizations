@@ -152,3 +152,30 @@ def get_stock_info(item_code, warehouse):
         "other_warehouses": other_wh
     }
 
+
+
+@frappe.whitelist()
+def bulk_delete_purchase_invoices(names):
+    if isinstance(names, str):
+        names = json.loads(names)
+    
+    deleted = []
+    skipped = []
+    
+    for name in names:
+        docstatus = frappe.db.get_value("Purchase Invoice", name, "docstatus")
+        if docstatus == 0:
+            try:
+                frappe.delete_doc("Purchase Invoice", name)
+                deleted.append(name)
+            except Exception as e:
+                frappe.log_error(f"Error deleting Purchase Invoice {name}: {str(e)}")
+                skipped.append(name)
+        else:
+            skipped.append(name)
+            
+    return {
+        "deleted": deleted,
+        "skipped": skipped
+    }
+
