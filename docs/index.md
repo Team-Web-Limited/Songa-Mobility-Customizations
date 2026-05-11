@@ -346,10 +346,8 @@ GET /boya_api_v2.get_invoice_details?invoice_id=ACC-PINV-2026-00835
 | 3 | Boya configures one webhook URL per company with `source_company` param | **Boya** |
 | 4 | Boya adds `invoice_id` field to webhook payload when user selects a PI | **Boya** |
 | 5 | Boya builds invoice selection UI using the lookup endpoints | **Boya** |
-| 6 | ERPNext re-enables the webhook handler (uncomment disabled line in `api_methods.py`) | **ERPNext Team** |
+| 6 | ERPNext enables the webhook handler | **ERPNext Team** |
 | 7 | Joint testing on staging | **Both** |
-| 8 | Cron job disabled on production | **ERPNext Team** |
-| 9 | Go live | **Both** |
 
 ---
 
