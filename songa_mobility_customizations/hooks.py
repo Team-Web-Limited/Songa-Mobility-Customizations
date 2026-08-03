@@ -292,6 +292,5 @@ scheduler_events = {
 fixtures = [
     "Custom Field",
     "Client Script",
-    "Notification",
     "Property Setter"
 ] 

@@ -1,0 +1,25 @@
+site_name: Boya-ERPNext API Integration
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+plugins:
+  - search
+  - mermaid2:
+      arguments:
+        theme: default
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js
+
+nav:
+  - Home: index.md
+  # - Boya-ERPNext API Integration: boya_erpnext_api_spec.md
