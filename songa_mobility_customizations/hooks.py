@@ -292,5 +292,6 @@ scheduler_events = {
 fixtures = [
     "Custom Field",
     "Client Script",
-    "Property Setter"
+    "Property Setter",
+    {"dt": "Notification", "filters": {"channel": "Email"}},
 ] 
