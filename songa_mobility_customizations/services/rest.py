@@ -179,3 +179,182 @@ def bulk_delete_purchase_invoices(names):
         "skipped": skipped
     }
 
+
+@frappe.whitelist()
+def bulk_pay_purchase_invoices(names, payment_details):
+    """Create Payment Entries for eligible Purchase Invoices.
+
+    By default, invoices are grouped by supplier and compatible accounting
+    dimensions. Set ``group_by_supplier`` to false to create one entry per
+    invoice. Each group is processed independently with a savepoint.
+    """
+    if isinstance(names, str):
+        names = frappe.parse_json(names)
+    if isinstance(payment_details, str):
+        payment_details = frappe.parse_json(payment_details)
+
+    if not names:
+        frappe.throw(_("Please select at least one Purchase Invoice."))
+    if not isinstance(payment_details, dict):
+        frappe.throw(_("Payment details are required."))
+
+    posting_date = payment_details.get("posting_date") or frappe.utils.nowdate()
+    paid_from = payment_details.get("paid_from")
+    mode_of_payment = payment_details.get("mode_of_payment")
+    reference_no = payment_details.get("reference_no")
+    reference_date = payment_details.get("reference_date")
+    submit_entries = frappe.utils.cint(payment_details.get("submit_entries"))
+    group_by_supplier = frappe.utils.cint(payment_details.get("group_by_supplier", 1))
+
+    if not paid_from:
+        frappe.throw(_("Please select a Bank/Cash Account."))
+    if not mode_of_payment:
+        frappe.throw(_("Please select a Mode of Payment."))
+    account_type = frappe.db.get_value(
+        "Account", {"name": paid_from, "is_group": 0}, "account_type"
+    )
+    if account_type not in ("Bank", "Cash"):
+        frappe.throw(_("The selected Bank/Cash Account is invalid."))
+
+    created = []
+    skipped = []
+    failed = []
+    groups = {}
+
+    for name in dict.fromkeys(names):
+        try:
+            invoice = frappe.get_doc("Purchase Invoice", name)
+            invoice.check_permission("read")
+
+            if invoice.docstatus != 1:
+                skipped.append({"invoice": name, "reason": _("Invoice is not submitted.")})
+                continue
+
+            if invoice.invoice_is_blocked():
+                skipped.append({"invoice": name, "reason": _("Invoice is on hold.")})
+                continue
+
+            outstanding = frappe.utils.flt(invoice.outstanding_amount)
+            if outstanding <= 0:
+                skipped.append({"invoice": name, "reason": _("Invoice has no outstanding amount.")})
+                continue
+
+            existing = frappe.db.sql(
+                """
+                select per.parent
+                from `tabPayment Entry Reference` per
+                inner join `tabPayment Entry` pe on pe.name = per.parent
+                where per.reference_doctype = 'Purchase Invoice'
+                    and per.reference_name = %s
+                    and per.allocated_amount > 0
+                    and pe.docstatus < 2
+                limit 1
+                """,
+                name,
+            )
+            if existing:
+                skipped.append({
+                    "invoice": name,
+                    "reason": _("Invoice already has an active Payment Entry ({0}).").format(existing[0][0]),
+                })
+                continue
+
+            pe = frappe.call(
+                "erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry",
+                dt="Purchase Invoice",
+                dn=name,
+                party_amount=outstanding,
+                bank_account=paid_from,
+                reference_date=reference_date,
+            )
+            pe.posting_date = posting_date
+            pe.reference_date = reference_date or posting_date
+            pe.reference_no = reference_no
+            pe.mode_of_payment = mode_of_payment
+
+            # These fields are custom in this installation and are used by
+            # the Payment Entry form to retain supplier accounting dimensions.
+            if invoice.meta.has_field("branch") and pe.meta.has_field("branch"):
+                pe.branch = invoice.get("branch")
+            if invoice.meta.has_field("cost_center") and pe.meta.has_field("cost_center"):
+                pe.cost_center = invoice.get("cost_center") or pe.cost_center
+
+            branch = invoice.get("branch") or None
+            cost_center = invoice.get("cost_center") or pe.cost_center or None
+
+            # Payment-specific deductions/taxes (for example early-payment
+            # discounts or withholding) must remain tied to their source
+            # invoice, so do not combine those entries.
+            can_group = group_by_supplier and not pe.deductions and not pe.taxes
+            if can_group:
+                group_key = (
+                    invoice.supplier,
+                    invoice.company,
+                    invoice.currency,
+                    invoice.credit_to,
+                    pe.paid_from_account_currency,
+                    branch,
+                    cost_center,
+                )
+            else:
+                group_key = (name,)
+
+            group = groups.setdefault(group_key, {"template": pe, "invoices": []})
+            group["invoices"].append({"invoice": invoice, "payment_entry": pe})
+        except Exception as exc:
+            failed.append({"invoice": name, "reason": frappe.safe_decode(str(exc))})
+
+    for group in groups.values():
+        savepoint = "bulk_payment_" + frappe.generate_hash(length=8)
+        frappe.db.savepoint(savepoint)
+        try:
+            template = group["template"]
+            entries = group["invoices"]
+            references = []
+            paid_amount = 0
+            received_amount = 0
+
+            for entry in entries:
+                source_pe = entry["payment_entry"]
+                paid_amount += frappe.utils.flt(source_pe.paid_amount)
+                received_amount += frappe.utils.flt(source_pe.received_amount)
+                references.extend(source_pe.references)
+
+            template.set("references", [])
+            for reference in references:
+                template.append(
+                    "references",
+                    {
+                        "reference_doctype": reference.reference_doctype,
+                        "reference_name": reference.reference_name,
+                        "due_date": reference.due_date,
+                        "bill_no": reference.bill_no,
+                        "total_amount": reference.total_amount,
+                        "outstanding_amount": reference.outstanding_amount,
+                        "allocated_amount": reference.allocated_amount,
+                        "payment_term": reference.payment_term,
+                    },
+                )
+
+            template.paid_amount = paid_amount
+            template.received_amount = received_amount
+            template.set_amounts()
+            template.insert()
+            if submit_entries:
+                template.submit()
+
+            for entry in entries:
+                created.append({
+                    "invoice": entry["invoice"].name,
+                    "payment_entry": template.name,
+                    "status": "Submitted" if submit_entries else "Draft",
+                })
+        except Exception as exc:
+            frappe.db.rollback(save_point=savepoint)
+            for entry in group["invoices"]:
+                failed.append({
+                    "invoice": entry["invoice"].name,
+                    "reason": frappe.safe_decode(str(exc)),
+                })
+
+    return {"created": created, "skipped": skipped, "failed": failed}
