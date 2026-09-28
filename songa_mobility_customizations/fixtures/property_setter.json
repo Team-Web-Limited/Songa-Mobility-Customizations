@@ -205,7 +205,7 @@
   "property": "options",
   "property_type": "Text",
   "row_name": null,
-  "value": "ACC-ASS-.YYYY.-\nEASVRM-SON-.####"
+  "value": "ACC-ASS-.YYYY.-"
  },
  {
   "default_value": null,
@@ -717,7 +717,7 @@
   "property": "naming_rule",
   "property_type": "Data",
   "row_name": null,
-  "value": "Expression"
+  "value": "Set by user"
  },
  {
   "default_value": null,
@@ -733,7 +733,7 @@
   "property": "autoname",
   "property_type": "Data",
   "row_name": null,
-  "value": "format:EASVRM-SON-.####"
+  "value": "prompt"
  },
  {
   "default_value": null,
